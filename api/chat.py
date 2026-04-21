@@ -17,7 +17,7 @@ def fetch_notion_kb():
     payload = json.dumps({
         "filter": {
             "property": "Activo",
-            "checkbox": { "equals": True }
+            "checkbox": {"equals": True}
         },
         "page_size": 100
     }).encode()
@@ -74,8 +74,7 @@ def fetch_notion_kb():
                 f"Solucion: {solucion}"
             )
 
-    kb_text = "\n---\n".join(cases)
-    return kb_text, None
+    return "\n---\n".join(cases), None
 
 
 def build_system_prompt(kb_text):
@@ -116,15 +115,15 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
-            self._respond(500, {"error": "ANTHROPIC_API_KEY no configurada en Vercel."})
+            self._respond(500, {"error": "GEMINI_API_KEY no configurada en Vercel."})
             return
 
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length))
 
-        # Fetch KB from Notion on every request
+        # Fetch KB from Notion
         try:
             kb_text, err = fetch_notion_kb()
             if err:
@@ -134,30 +133,55 @@ class handler(BaseHTTPRequestHandler):
             self._respond(500, {"error": f"Error al conectar con Notion: {str(ex)}"})
             return
 
-        # Build request for Anthropic
-        anthropic_body = json.dumps({
-            "model":      body.get("model", "claude-sonnet-4-20250514"),
-            "max_tokens": body.get("max_tokens", 1024),
-            "system":     build_system_prompt(kb_text),
-            "messages":   body.get("messages", []),
+        system_prompt = build_system_prompt(kb_text)
+        messages      = body.get("messages", [])
+
+        # Build Gemini request — inject system into first user message
+        gemini_messages = []
+        for i, msg in enumerate(messages):
+            role = "user" if msg["role"] == "user" else "model"
+            text = msg["content"]
+            if i == 0:
+                text = system_prompt + "\n\n---\n\n" + text
+            gemini_messages.append({
+                "role": role,
+                "parts": [{"text": text}]
+            })
+
+        gemini_body = json.dumps({
+            "contents": gemini_messages,
+            "generationConfig": {
+                "maxOutputTokens": body.get("max_tokens", 1024),
+                "temperature": 0.3
+            }
         }).encode()
+
+        model = "gemini-1.5-flash"
+        url   = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
         try:
             req = urllib.request.Request(
-                "https://api.anthropic.com/v1/messages",
-                data=anthropic_body,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
+                url,
+                data=gemini_body,
+                headers={"Content-Type": "application/json"},
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=60) as resp:
-                self._respond_raw(200, resp.read())
+                gemini_data = json.loads(resp.read())
+
+            text_out = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+            self._respond(200, {
+                "content": [{"type": "text", "text": text_out}]
+            })
 
         except urllib.error.HTTPError as e:
-            self._respond_raw(e.code, e.read())
+            err_body = e.read()
+            try:
+                err_json = json.loads(err_body)
+                msg = err_json.get("error", {}).get("message", err_body.decode(errors="replace"))
+            except Exception:
+                msg = err_body.decode(errors="replace")
+            self._respond(e.code, {"error": msg})
         except Exception as ex:
             self._respond(500, {"error": str(ex)})
 
@@ -173,10 +197,3 @@ class handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
         self.wfile.write(payload)
-
-    def _respond_raw(self, code, raw_bytes):
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self._cors()
-        self.end_headers()
-        self.wfile.write(raw_bytes)
