@@ -156,7 +156,7 @@ class handler(BaseHTTPRequestHandler):
             }
         }).encode()
 
-        model = "gemini-1.5-flash"
+        model = "gemini-2.5-flash"
         url   = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
 
         try:
