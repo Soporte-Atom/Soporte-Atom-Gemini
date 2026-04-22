@@ -1,145 +1,190 @@
 /**
  * renderer.js
- * Convierte los datos de respuesta en elementos del DOM.
+ * Convierte los datos de respuesta de Claude en elementos del DOM.
+ * No hace llamadas a la API — solo renderiza.
  */
 
 const Renderer = (function () {
 
-  const LOGO_SRC = "/img/atom-logo.png";
-
+  /* ── Category → CSS class & emoji map ──────────────────── */
   const CAT_MAP = {
-    "Flujos y Flowbuilder" : { cls: "cat--flujos",     emoji: "⚙️" },
-    "Smartons"             : { cls: "cat--smartons",   emoji: "🤖" },
-    "Grupos y Asignacion"  : { cls: "cat--grupos",     emoji: "👥" },
-    "Plantillas y Canales" : { cls: "cat--plantillas", emoji: "📱" },
-    "Usuarios y Roles"     : { cls: "cat--usuarios",   emoji: "🔑" },
-    "Configuracion General": { cls: "cat--config",     emoji: "⚙️" },
-    "Integraciones y API"  : { cls: "cat--api",        emoji: "🔗" },
+    "Flujos y Flowbuilder" : { cls: "cat--flujos",     emoji: "⚙️"  },
+    "Smartons"             : { cls: "cat--smartons",   emoji: "🤖"  },
+    "Grupos y Asignacion"  : { cls: "cat--grupos",     emoji: "👥"  },
+    "Plantillas y Canales" : { cls: "cat--plantillas", emoji: "📱"  },
+    "Usuarios y Roles"     : { cls: "cat--usuarios",   emoji: "🔑"  },
+    "Configuracion General": { cls: "cat--config",     emoji: "⚙️"  },
+    "Integraciones y API"  : { cls: "cat--api",        emoji: "🔗"  },
   };
 
+  /* Remove accents for category matching */
   function normalize(str) {
-    return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return (str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
   }
 
   function getCatMeta(cat) {
     const nCat = normalize(cat);
     for (const key in CAT_MAP) {
-      if (nCat.includes(normalize(key).split(" ")[0])) return CAT_MAP[key];
+      const nKey = normalize(key).split(" ")[0];
+      if (nCat.includes(nKey)) return CAT_MAP[key];
     }
     return { cls: "cat--config", emoji: "📋" };
   }
 
+  /* Escape HTML special characters */
   function esc(str) {
     return String(str || "")
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
+  /* Convert **bold** markdown to <b> tags */
   function boldify(str) {
     return esc(str).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
   }
 
-  /* ── Avatar helpers ── */
-  function createBotAvatar() {
-    var avatar = document.createElement("div");
-    avatar.className = "avatar";
+  /* ── Public render functions ─────────────────────────────── */
 
-    var img = document.createElement("img");
-    img.src = LOGO_SRC;
-    img.alt = "Atom";
-    img.style.cssText = "width:100%;height:100%;border-radius:50%;object-fit:contain;";
-
-    // Fallback si la imagen falla
-    img.onerror = function () {
-      avatar.innerHTML = "";
-      avatar.style.cssText = "background:#E85D04;color:white;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;";
-      avatar.textContent = "A";
-    };
-
-    avatar.appendChild(img);
-    return avatar;
-  }
-
-  function createUserAvatar() {
-    var avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = "👤";
-    return avatar;
-  }
-
-  /* ── Render functions ── */
+  /**
+   * Renders a structured response from Claude into a rich card.
+   * @param {Object} data - Parsed JSON from Claude
+   * @returns {string} HTML string
+   */
   function renderRich(data) {
     const meta = getCatMeta(data.categoria || "");
     let html = '<div class="bot-card">';
-    html += '<div><span class="cat-badge ' + meta.cls + '">' + meta.emoji + ' ' + esc(data.categoria || "General") + '</span></div>';
 
+    /* Category badge */
+    html += `<div>
+      <span class="cat-badge ${meta.cls}">
+        ${meta.emoji} ${esc(data.categoria || "General")}
+      </span>
+    </div>`;
+
+    /* Symptoms */
     if (data.sintomas && data.sintomas.length) {
-      html += '<div class="symptoms-card"><div class="section-label">🔍 Síntomas detectados</div><div class="pills">';
-      data.sintomas.forEach(function (s) { html += '<span class="pill">' + esc(s) + '</span>'; });
-      html += '</div></div>';
-    }
-
-    if (data.causa) {
-      html += '<div class="cause-card"><div class="cause-label">' + esc(data.emoji_causa || "💡") + ' Causa probable</div>'
-            + '<div class="cause-text">' + boldify(data.causa) + '</div></div>';
-    }
-
-    if (data.pasos && data.pasos.length) {
-      html += '<div class="steps-card"><div class="steps-label">🔎 Dónde buscar / Qué revisar</div>';
-      data.pasos.forEach(function (p, i) {
-        html += '<div class="step"><div class="step-num">' + (i + 1) + '</div><div class="step-text">' + boldify(p) + '</div></div>';
+      html += '<div class="symptoms-card">';
+      html += '<div class="section-label">🔍 Síntomas detectados</div>';
+      html += '<div class="pills">';
+      data.sintomas.forEach(s => {
+        html += `<span class="pill">${esc(s)}</span>`;
       });
-      html += '</div>';
+      html += "</div></div>";
     }
 
+    /* Cause */
+    if (data.causa) {
+      html += `
+        <div class="cause-card">
+          <div class="cause-label">${esc(data.emoji_causa || "💡")} Causa probable</div>
+          <div class="cause-text">${boldify(data.causa)}</div>
+        </div>`;
+    }
+
+    /* Steps */
+    if (data.pasos && data.pasos.length) {
+      html += '<div class="steps-card">';
+      html += '<div class="steps-label">🔎 Dónde buscar / Qué revisar</div>';
+      data.pasos.forEach((p, i) => {
+        html += `
+          <div class="step">
+            <div class="step-num">${i + 1}</div>
+            <div class="step-text">${boldify(p)}</div>
+          </div>`;
+      });
+      html += "</div>";
+    }
+
+    /* Follow-up question */
     if (data.followup) {
-      html += '<div class="followup">💬 ' + esc(data.followup) + '</div>';
+      html += `<div class="followup">💬 ${esc(data.followup)}</div>`;
     }
 
-    html += '</div>';
+    html += "</div>";
     return html;
   }
 
+  /**
+   * Renders a plain text response.
+   * @param {string} text
+   * @returns {string} HTML string
+   */
   function renderSimple(text) {
-    var content = esc(text).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
-    return '<div class="bot-bubble">' + content + '</div>';
+    const content = esc(text)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/\n/g, "<br>");
+    return `<div class="bot-bubble">${content}</div>`;
   }
 
+  /**
+   * Renders the typing indicator.
+   * @returns {HTMLElement}
+   */
   function createTypingIndicator() {
-    var wrap = document.createElement("div");
+    const wrap = document.createElement("div");
     wrap.className = "msg bot";
     wrap.id = "typing-indicator";
-    var bubble = document.createElement("div");
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.innerHTML = '<img src="/img/atom-logo.svg" alt="Atom" />';
+
+    const bubble = document.createElement("div");
     bubble.className = "typing-wrap";
     bubble.innerHTML = "<span></span><span></span><span></span>";
-    wrap.appendChild(createBotAvatar());
+
+    wrap.appendChild(avatar);
     wrap.appendChild(bubble);
     return wrap;
   }
 
+  /**
+   * Renders a message wrapper (bot or user).
+   * @param {"bot"|"user"} role
+   * @param {string} htmlContent
+   * @param {string[]} [suggestions]
+   * @returns {HTMLElement}
+   */
   function createMessage(role, htmlContent, suggestions) {
-    var wrap = document.createElement("div");
-    wrap.className = "msg " + role;
-    var avatar = role === "bot" ? createBotAvatar() : createUserAvatar();
-    var content = document.createElement("div");
+    const wrap = document.createElement("div");
+    wrap.className = `msg ${role}`;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.innerHTML = role === "bot" ? '<img src="/img/atom-logo.svg" alt="Atom" />' : "👤";
+
+    const content = document.createElement("div");
     content.style.width = "100%";
     content.innerHTML = htmlContent;
+
     if (suggestions && suggestions.length) {
-      var sugsEl = document.createElement("div");
+      const sugsEl = document.createElement("div");
       sugsEl.className = "suggestions";
-      suggestions.forEach(function (text) {
-        var btn = document.createElement("button");
+      suggestions.forEach(text => {
+        const btn = document.createElement("button");
         btn.className = "sug";
         btn.textContent = text;
         sugsEl.appendChild(btn);
       });
       content.appendChild(sugsEl);
     }
+
     wrap.appendChild(avatar);
     wrap.appendChild(content);
     return wrap;
   }
 
-  return { renderRich, renderSimple, createMessage, createTypingIndicator };
+  /* ── Public API ───────────────────────────────────────────── */
+  return {
+    renderRich,
+    renderSimple,
+    createMessage,
+    createTypingIndicator,
+  };
 
 })();
