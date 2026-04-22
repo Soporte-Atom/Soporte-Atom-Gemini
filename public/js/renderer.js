@@ -156,7 +156,7 @@ const Renderer = (function () {
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.innerHTML = role === "bot" ? '<img src="/img/atom-logo.svg" alt="Atom" />' : "👤";
+    avatar.innerHTML = role === "bot" ? '<img src="../public/img/atom-logo.png" alt="Atom" />' : "👤";
 
     const content = document.createElement("div");
     content.style.width = "100%";
