@@ -8,13 +8,13 @@ const Renderer = (function () {
 
   /* ── Category → CSS class & emoji map ──────────────────── */
   const CAT_MAP = {
-    "Flujos y Campañas": { cls: "cat--flujos", emoji: "🏗️" },
-    "Smartons": { cls: "cat--smartons", emoji: "🤖" },
-    "Grupos y Asignacion": { cls: "cat--grupos", emoji: "👥" },
-    "Plantillas y Canales": { cls: "cat--plantillas", emoji: "📱" },
-    "Usuarios y Roles": { cls: "cat--usuarios", emoji: "🔑" },
-    "Configuracion General": { cls: "cat--config", emoji: "⚙️" },
-    "Integraciones y API": { cls: "cat--api", emoji: "🌐" },
+    "Flujos y Campañas"    : { cls: "cat--flujos",     emoji: "🏗️"  },
+    "Smartons"             : { cls: "cat--smartons",   emoji: "🤖"  },
+    "Grupos y Asignacion"  : { cls: "cat--grupos",     emoji: "👥"  },
+    "Plantillas y Canales" : { cls: "cat--plantillas", emoji: "📱"  },
+    "Usuarios y Roles"     : { cls: "cat--usuarios",   emoji: "🔑"  },
+    "Configuracion General": { cls: "cat--config",     emoji: "⚙️"  },
+    "Integraciones y API"  : { cls: "cat--api",        emoji: "🌐"  },
   };
 
   function normalize(str) {
@@ -52,14 +52,14 @@ const Renderer = (function () {
     const avatar = document.createElement("div");
     avatar.className = "avatar";
     const img = document.createElement("img");
-    img.src = "/img/atom-logo.png";
+    img.src = "/public/img/atom-logo.png";
     img.alt = "Atom";
     img.style.cssText = "width:100%;height:100%;border-radius:50%;object-fit:contain;";
     img.onerror = function () {
-      avatar.innerHTML = "";
-      avatar.style.cssText = "background:#E85D04;color:white;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;";
-      avatar.textContent = "A";
-    };
+    avatar.innerHTML = "";
+    avatar.style.cssText = "background:#E85D04;color:white;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;";
+    avatar.textContent = "A";
+};
     avatar.appendChild(img);
     return avatar;
   }
