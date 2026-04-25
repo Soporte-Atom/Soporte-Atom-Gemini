@@ -183,7 +183,7 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.0-flash",
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: messages,
