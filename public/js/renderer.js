@@ -8,21 +8,17 @@ const Renderer = (function () {
 
   /* ── Category → CSS class & emoji map ──────────────────── */
   const CAT_MAP = {
-    "Flujos y Campañas"    : { cls: "cat--flujos",     emoji: "🏗️"  },
-    "Smartons"             : { cls: "cat--smartons",   emoji: "🤖"  },
-    "Grupos y Asignacion"  : { cls: "cat--grupos",     emoji: "👥"  },
-    "Plantillas y Canales" : { cls: "cat--plantillas", emoji: "📱"  },
-    "Usuarios y Roles"     : { cls: "cat--usuarios",   emoji: "🔑"  },
-    "Configuracion General": { cls: "cat--config",     emoji: "⚙️"  },
-    "Integraciones y API"  : { cls: "cat--api",        emoji: "🌐"  },
+    "Flujos y Campañas": { cls: "cat--flujos", emoji: "🏗️" },
+    "Smartons": { cls: "cat--smartons", emoji: "🤖" },
+    "Grupos y Asignacion": { cls: "cat--grupos", emoji: "👥" },
+    "Plantillas y Canales": { cls: "cat--plantillas", emoji: "📱" },
+    "Usuarios y Roles": { cls: "cat--usuarios", emoji: "🔑" },
+    "Configuracion General": { cls: "cat--config", emoji: "⚙️" },
+    "Integraciones y API": { cls: "cat--api", emoji: "🌐" },
   };
 
-  /* Remove accents for category matching */
   function normalize(str) {
-    return (str || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
+    return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   }
 
   function getCatMeta(cat) {
@@ -34,73 +30,79 @@ const Renderer = (function () {
     return { cls: "cat--config", emoji: "📋" };
   }
 
-  /* Escape HTML special characters */
   function esc(str) {
     return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  /* Convert **bold** markdown to <b> tags */
   function boldify(str) {
     return esc(str).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
   }
 
-  /* ── Public render functions ─────────────────────────────── */
+  /* Elimina el número al inicio del paso para evitar duplicado con el círculo
+     ej: "1. Ir a Configuraciones" → "Ir a Configuraciones"
+     ej: "1) Ir a Configuraciones" → "Ir a Configuraciones"  */
+  function stripLeadingNumber(str) {
+    return (str || "").replace(/^\s*\d+[\.\)]\s*/, "");
+  }
 
-  /**
-   * Renders a structured response from Gemini into a rich card.
-   * @param {Object} data - Parsed JSON from Gemini
-   * @returns {string} HTML string
-   */
+  /* ── Avatar helpers ── */
+  function createBotAvatar() {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    const img = document.createElement("img");
+    img.src = "/img/atom-logo.png";
+    img.alt = "Atom";
+    img.style.cssText = "width:100%;height:100%;border-radius:50%;object-fit:contain;";
+    img.onerror = function () {
+      avatar.innerHTML = "";
+      avatar.style.cssText = "background:#E85D04;color:white;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;";
+      avatar.textContent = "A";
+    };
+    avatar.appendChild(img);
+    return avatar;
+  }
+
+  function createUserAvatar() {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.innerHTML = "👨🏻‍💻";
+    return avatar;
+  }
+
+  /* ── Render functions ── */
   function renderRich(data) {
     const meta = getCatMeta(data.categoria || "");
     let html = '<div class="bot-card">';
 
-    /* Category badge */
-    html += `<div>
-      <span class="cat-badge ${meta.cls}">
-        ${meta.emoji} ${esc(data.categoria || "General")}
-      </span>
-    </div>`;
+    html += `<div><span class="cat-badge ${meta.cls}">${meta.emoji} ${esc(data.categoria || "General")}</span></div>`;
 
-    /* Symptoms */
     if (data.sintomas && data.sintomas.length) {
-      html += '<div class="symptoms-card">';
-      html += '<div class="section-label">🔍 Síntomas detectados</div>';
-      html += '<div class="pills">';
-      data.sintomas.forEach(s => {
-        html += `<span class="pill">${esc(s)}</span>`;
-      });
+      html += '<div class="symptoms-card"><div class="section-label">🔍 Síntomas detectados</div><div class="pills">';
+      data.sintomas.forEach(s => { html += `<span class="pill">${esc(s)}</span>`; });
       html += "</div></div>";
     }
 
-    /* Cause */
     if (data.causa) {
-      html += `
-        <div class="cause-card">
-          <div class="cause-label">${esc(data.emoji_causa || "💡")} Causa probable</div>
-          <div class="cause-text">${boldify(data.causa)}</div>
-        </div>`;
+      html += `<div class="cause-card">
+        <div class="cause-label">${esc(data.emoji_causa || "💡")} Causa probable</div>
+        <div class="cause-text">${boldify(data.causa)}</div>
+      </div>`;
     }
 
-    /* Steps */
     if (data.pasos && data.pasos.length) {
-      html += '<div class="steps-card">';
-      html += '<div class="steps-label">🔎 Dónde buscar / Qué revisar</div>';
+      html += '<div class="steps-card"><div class="steps-label">🔎 Dónde buscar / Qué revisar</div>';
       data.pasos.forEach((p, i) => {
-        html += `
-          <div class="step">
-            <div class="step-num">${i + 1}</div>
-            <div class="step-text">${boldify(p)}</div>
-          </div>`;
+        const stepText = stripLeadingNumber(p);
+        html += `<div class="step">
+          <div class="step-num">${i + 1}</div>
+          <div class="step-text">${boldify(stepText)}</div>
+        </div>`;
       });
       html += "</div>";
     }
 
-    /* Follow-up question */
     if (data.followup) {
       html += `<div class="followup">💬 ${esc(data.followup)}</div>`;
     }
@@ -109,11 +111,6 @@ const Renderer = (function () {
     return html;
   }
 
-  /**
-   * Renders a plain text response.
-   * @param {string} text
-   * @returns {string} HTML string
-   */
   function renderSimple(text) {
     const content = esc(text)
       .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
@@ -121,47 +118,25 @@ const Renderer = (function () {
     return `<div class="bot-bubble">${content}</div>`;
   }
 
-  /**
-   * Renders the typing indicator.
-   * @returns {HTMLElement}
-   */
   function createTypingIndicator() {
     const wrap = document.createElement("div");
     wrap.className = "msg bot";
     wrap.id = "typing-indicator";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.innerHTML = '<img src="../public/img/atom-logo.png" alt="Atom" />';
-
     const bubble = document.createElement("div");
     bubble.className = "typing-wrap";
     bubble.innerHTML = "<span></span><span></span><span></span>";
-
-    wrap.appendChild(avatar);
+    wrap.appendChild(createBotAvatar());
     wrap.appendChild(bubble);
     return wrap;
   }
 
-  /**
-   * Renders a message wrapper (bot or user).
-   * @param {"bot"|"user"} role
-   * @param {string} htmlContent
-   * @param {string[]} [suggestions]
-   * @returns {HTMLElement}
-   */
   function createMessage(role, htmlContent, suggestions) {
     const wrap = document.createElement("div");
     wrap.className = `msg ${role}`;
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.innerHTML = role === "bot" ? '<img src="../public/img/atom-logo.png" alt="Atom" />' : "👨🏻‍💻";
-
+    const avatar = role === "bot" ? createBotAvatar() : createUserAvatar();
     const content = document.createElement("div");
     content.style.width = "100%";
     content.innerHTML = htmlContent;
-
     if (suggestions && suggestions.length) {
       const sugsEl = document.createElement("div");
       sugsEl.className = "suggestions";
@@ -173,18 +148,11 @@ const Renderer = (function () {
       });
       content.appendChild(sugsEl);
     }
-
     wrap.appendChild(avatar);
     wrap.appendChild(content);
     return wrap;
   }
 
-  /* ── Public API ───────────────────────────────────────────── */
-  return {
-    renderRich,
-    renderSimple,
-    createMessage,
-    createTypingIndicator,
-  };
+  return { renderRich, renderSimple, createMessage, createTypingIndicator };
 
 })();
