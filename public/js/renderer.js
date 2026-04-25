@@ -1,6 +1,6 @@
 /**
  * renderer.js
- * Convierte los datos de respuesta de Claude en elementos del DOM.
+ * Convierte los datos de respuesta de Gemini en elementos del DOM.
  * No hace llamadas a la API — solo renderiza.
  */
 
@@ -8,13 +8,13 @@ const Renderer = (function () {
 
   /* ── Category → CSS class & emoji map ──────────────────── */
   const CAT_MAP = {
-    "Flujos y Flowbuilder" : { cls: "cat--flujos",     emoji: "⚙️"  },
+    "Flujos y Campañas"    : { cls: "cat--flujos",     emoji: "🏗️"  },
     "Smartons"             : { cls: "cat--smartons",   emoji: "🤖"  },
     "Grupos y Asignacion"  : { cls: "cat--grupos",     emoji: "👥"  },
     "Plantillas y Canales" : { cls: "cat--plantillas", emoji: "📱"  },
     "Usuarios y Roles"     : { cls: "cat--usuarios",   emoji: "🔑"  },
     "Configuracion General": { cls: "cat--config",     emoji: "⚙️"  },
-    "Integraciones y API"  : { cls: "cat--api",        emoji: "🔗"  },
+    "Integraciones y API"  : { cls: "cat--api",        emoji: "🌐"  },
   };
 
   /* Remove accents for category matching */
@@ -51,8 +51,8 @@ const Renderer = (function () {
   /* ── Public render functions ─────────────────────────────── */
 
   /**
-   * Renders a structured response from Claude into a rich card.
-   * @param {Object} data - Parsed JSON from Claude
+   * Renders a structured response from Gemini into a rich card.
+   * @param {Object} data - Parsed JSON from Gemini
    * @returns {string} HTML string
    */
   function renderRich(data) {
@@ -132,7 +132,7 @@ const Renderer = (function () {
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.innerHTML = '<img src="/img/atom-logo.svg" alt="Atom" />';
+    avatar.innerHTML = '<img src="../public/img/atom-logo.png" alt="Atom" />';
 
     const bubble = document.createElement("div");
     bubble.className = "typing-wrap";
@@ -156,7 +156,7 @@ const Renderer = (function () {
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.innerHTML = role === "bot" ? '<img src="../public/img/atom-logo.png" alt="Atom" />' : "👤";
+    avatar.innerHTML = role === "bot" ? '<img src="../public/img/atom-logo.png" alt="Atom" />' : "👨🏻‍💻";
 
     const content = document.createElement("div");
     content.style.width = "100%";

@@ -100,7 +100,10 @@ def build_system_prompt(kb_text):
         "Si no hay info relevante usa sin_resultado:true y en causa explica que no encontraste info.",
         "Los pasos deben ser concretos con rutas de menus si aplica.",
         "Usa emojis en los pasos para hacerlos mas visuales.",
-        "Responde en espanol. SOLO el JSON, nada mas.",
+        "CRITICO: Tu respuesta debe comenzar con { y terminar con }.",
+        "NO uses bloques de codigo, NO uses ```json, NO uses ``` de ningun tipo.",
+        "NO escribas texto antes ni despues del JSON.",
+        "SOLO el objeto JSON puro. Si no lo haces, la respuesta fallara.",
     ])
 
 

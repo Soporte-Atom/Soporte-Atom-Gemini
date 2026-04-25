@@ -6,9 +6,9 @@
 (function () {
 
   // ── Configuración ──────────────────────────────────────────────────
-  const STORAGE_KEY    = "atomchat_history";       // Clave en localStorage
-  const MAX_MESSAGES   = 40;                        // Máximo de mensajes guardados
-  const SESSION_HOURS  = 8;                         // Horas antes de limpiar el historial
+  const STORAGE_KEY = "atomchat_history";       // Clave en localStorage
+  const MAX_MESSAGES = 48;                        // Máximo de mensajes guardados
+  const SESSION_HOURS = 24;                         // Horas antes de limpiar el historial
 
   // ── System prompt ──────────────────────────────────────────────────
   // Nota: con Notion como KB, el system prompt lo construye api/chat.py
@@ -18,7 +18,7 @@
     "Ayudas a agentes NUEVOS a entender y resolver casos usando la base de conocimiento.",
     "",
     "FORMATO DE RESPUESTA OBLIGATORIO:",
-    "Responde SIEMPRE en este JSON exacto (sin markdown, sin texto fuera del JSON):",
+    "Responde SIEMPRE en este JSON exacto:",
     "{",
     "  \"categoria\": \"nombre exacto de la categoria\",",
     "  \"sintomas\": [\"sintoma detectado 1\", \"sintoma detectado 2\"],",
@@ -29,27 +29,31 @@
     "  \"sin_resultado\": false",
     "}",
     "",
-    "Si no hay info relevante usa sin_resultado:true.",
+    "Si no hay info relevante usa sin_resultado:true y en causa explica que no encontraste info.",
     "Pasos concretos con rutas de menus si aplica.",
-    "Responde en espanol. SOLO el JSON.",
+    "Responde en espanol.",
+    "CRITICO: Tu respuesta debe comenzar con { y terminar con }.",
+    "NO uses bloques de codigo markdown (no uses ```json ni ```).",
+    "NO escribas texto antes ni despues del JSON.",
+    "SOLO el objeto JSON puro, nada mas.",
   ].join("\n");
 
   const WELCOME_SUGGESTIONS = [
-    "conversaciones se cierran solas",
-    "triángulo rojo en mensajes",
-    "el bot no asigna al agente",
-    "plantilla no aparece en el flujo",
+    "Conversaciones se cierran solas",
+    "Triángulo rojo en mensajes",
+    "El bot no asigna al agente",
+    "Plantilla no aparece en el flujo",
     "HubSpot no sincroniza contactos",
-    "error 131049 en plantillas",
+    "Error 131049 en plantillas",
   ];
 
   // ── Estado ─────────────────────────────────────────────────────────
-  let history   = [];   // Array de { role, content } para la API
-  let rendered  = [];   // Array de { role, html } para restaurar en pantalla
+  let history = [];   // Array de { role, content } para la API
+  let rendered = [];   // Array de { role, html } para restaurar en pantalla
   let isLoading = false;
 
   // ── DOM refs ────────────────────────────────────────────────────────
-  const msgsEl  = document.getElementById("msgs");
+  const msgsEl = document.getElementById("msgs");
   const inputEl = document.getElementById("inp");
   const sendBtn = document.getElementById("sbtn");
   const countEl = document.getElementById("kb-count");
@@ -62,8 +66,8 @@
   function saveToStorage() {
     try {
       const payload = {
-        savedAt:  Date.now(),
-        history:  history,
+        savedAt: Date.now(),
+        history: history,
         rendered: rendered,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -103,7 +107,7 @@
    */
   function clearHistory() {
     localStorage.removeItem(STORAGE_KEY);
-    history  = [];
+    history = [];
     rendered = [];
     msgsEl.innerHTML = "";
     showWelcome();
@@ -126,15 +130,21 @@
   }
 
   function parseReply(text) {
-    const t = text.trim();
-    const s = t.indexOf("{");
-    const e = t.lastIndexOf("}");
+    // Eliminar bloques de código markdown que Gemini agrega a veces
+    var t = text.trim()
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    var s = t.indexOf("{");
+    var e = t.lastIndexOf("}");
     if (s === -1 || e === -1) return null;
     try { return JSON.parse(t.slice(s, e + 1)); } catch { return null; }
   }
 
   function errorToString(err) {
-    if (!err)                    return "Error desconocido";
+    if (!err) return "Error desconocido";
     if (typeof err === "string") return err;
     if (typeof err === "object") return err.message || JSON.stringify(err);
     return String(err);
@@ -158,7 +168,7 @@
    */
   function showWelcome() {
     const html = Renderer.renderSimple(
-      "👋 ¡Hola! Soy tu asistente de soporte interno para AtomChat.\n\n" +
+      "👋 ¡Hola! Soy tu asistente de soporte interno para Atom 🤖.\n\n" +
       "Cuéntame con tus propias palabras cómo describe el cliente el problema " +
       "y te digo qué puede estar pasando y por dónde revisar."
     );
@@ -173,10 +183,10 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model:      "claude-sonnet-4-20250514",
+        model: "gemini-3-flash-preview",
         max_tokens: 1024,
-        system:     SYSTEM_PROMPT,
-        messages:   messages,
+        system: SYSTEM_PROMPT,
+        messages: messages,
       }),
     });
     const data = await res.json();
@@ -210,8 +220,8 @@
 
       // Error de la API
       if (data.error || (data._status && data._status >= 400)) {
-        const msg  = errorToString(data.error);
-        let hint   = "";
+        const msg = errorToString(data.error);
+        let hint = "";
         if (data._status === 401) hint = " — Verifica la API key en Vercel > Settings > Environment Variables.";
         if (data._status === 429) hint = " — Límite de tasa alcanzado, espera un momento.";
         const errHtml = Renderer.renderSimple("❌ " + msg + hint);
@@ -235,7 +245,7 @@
         botHtml = Renderer.renderRich(parsed);
       } else if (parsed && parsed.sin_resultado) {
         botHtml = Renderer.renderSimple(
-          "🔍 " + (parsed.causa || "No encontré información en la base de conocimiento. Escala este caso.")
+          "🔍 " + (parsed.causa || "No encontré información en la base de conocimiento. Escala este caso con el equipo de soporte.")
         );
       } else {
         botHtml = Renderer.renderSimple(replyText);
@@ -246,7 +256,7 @@
 
       // Mantener solo los últimos MAX_MESSAGES mensajes
       if (history.length > MAX_MESSAGES) {
-        history  = history.slice(-MAX_MESSAGES);
+        history = history.slice(-MAX_MESSAGES);
         rendered = rendered.slice(-MAX_MESSAGES);
       }
 
@@ -273,10 +283,10 @@
     if (!topbar) return;
 
     const btn = document.createElement("button");
-    btn.title     = "Limpiar conversación";
+    btn.title = "Limpiar conversación";
     btn.innerHTML = "🗑️";
     btn.style.cssText = [
-      "background: rgba(255,255,255,0.15)",
+      "background: rgba(252, 248, 240, 0.74)",
       "border: none",
       "border-radius: 8px",
       "cursor: pointer",
@@ -327,7 +337,7 @@
   // ── Init ─────────────────────────────────────────────────────────────
 
   function init() {
-    if (countEl) countEl.textContent = (window.KB_COUNT || 260) + " casos";
+    if (countEl) countEl.textContent = "+ " +(window.KB_COUNT || 260) + " casos";
 
     addClearButton();
 
@@ -336,11 +346,12 @@
 
     if (saved && saved.rendered && saved.rendered.length > 0) {
       // Restaurar historial de API (para continuar la conversación con contexto)
-      history  = saved.history  || [];
+      history = saved.history || [];
       rendered = saved.rendered || [];
 
       // Mostrar bienvenida resumida con indicador de sesión restaurada
       const resumeHtml = Renderer.renderSimple(
+        WELCOME_SUGGESTIONS,
         "🔄 Conversación restaurada — tienes " + rendered.length +
         " mensajes anteriores.\n\nPuedes continuar donde lo dejaste o pulsar 🗑️ para empezar de cero."
       );
